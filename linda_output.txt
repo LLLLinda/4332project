@@ -1,0 +1,37 @@
+
+(tut) D:\admin\Desktop\Project 1 Sentiment Classification>python proj1_example.py
+Using TensorFlow backend.
+Vocabulary Size: 114544
+Training Set Size: 100000
+Validation Set Size: 10000
+Test Set Size: 10000
+Training Set Shape: (100000, 300)
+Validation Set Shape: (10000, 300)
+Testing Set Shape: (10000, 300)
+Epoch 1/10
+2019-03-05 18:42:38.598729: I tensorflow/core/platform/cpu_feature_guard.cc:141] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX AVX2
+100000/100000 [==============================] - 1079s 11ms/step - loss: 1.4289 - acc: 0.4394
+Epoch 2/10
+ 12400/100000 [==>...........................] - ETA: 14:45 - loss: 1.4244 - acc: 0.4406
+ 
+ 
+ (tut) D:\admin\Desktop\Project 1 Sentiment Classification>python proj1_example.py
+Using TensorFlow backend.
+Vocabulary Size: 114544
+Training Set Size: 100000
+Validation Set Size: 10000
+Test Set Size: 10000
+Training Set Shape: (100000, 300)
+Validation Set Shape: (10000, 300)
+Testing Set Shape: (10000, 300)
+Epoch 1/10
+2019-03-05 18:42:38.598729: I tensorflow/core/platform/cpu_feature_guard.cc:141] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX AVX2
+100000/100000 [==============================] - 1079s 11ms/step - loss: 1.4289 - acc: 0.4394
+Epoch 2/10
+100000/100000 [==============================] - 889s 9ms/step - loss: 1.4278 - acc: 0.4396
+Epoch 3/10
+100000/100000 [==============================] - 730s 7ms/step - loss: 1.4278 - acc: 0.4396
+Epoch 4/10
+100000/100000 [==============================] - 731s 7ms/step - loss: 1.4272 - acc: 0.4396
+Epoch 5/10
+  9900/100000 [=>............................] - ETA: 11:09 - loss: 1.4238 - acc: 0.4439
