@@ -1,0 +1,26 @@
+Vocabulary Size: 114544
+Training Set Size: 100000
+Validation Set Size: 10000
+Test Set Size: 10000
+Training Set Shape: (100000, 300)
+Validation Set Shape: (10000, 300)
+Testing Set Shape: (10000, 300)
+Input size: 114546.000000 ; Output Size: 5.000000
+Epoch 1/2
+
+100000/100000 [==============================] - 1840s 18ms/step - loss: 1.0449 - acc: 0.5932
+
+Epoch 00001: acc improved from -inf to 0.59322, saving model to best_model.h5
+Epoch 2/2
+100000/100000 [==============================] - 2596s 26ms/step - loss: 0.7609 - acc: 0.6911
+
+Epoch 00002: acc improved from 0.59322 to 0.69105, saving model to best_model.h5
+
+100000/100000 [==============================] - 610s 6ms/step
+Training Loss: 0.6487905896008015
+ Training Accuracy: 0.7499399999380112
+
+10000/10000 [==============================] - 63s 6ms/step
+Validation Loss: 0.821412006020546
+ Validation Accuracy: 0.6640000003576279
+
