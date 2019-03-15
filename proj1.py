@@ -3,28 +3,32 @@ import string
 import pandas as pd
 import nltk
 import keras
-
+from keras import regularizers
 from sklearn import random_projection
 from sklearn.metrics import accuracy_score
 from nltk.corpus import stopwords
-
+from nltk.tokenize import sent_tokenize
 from keras.models import Sequential
-from keras.layers import Embedding, Dense, Dropout, LSTM
-from keras.layers import Conv1D, Flatten, Activation, MaxPooling1D, Lambda
+from keras.layers import Embedding, Dense, Dropout, LSTM, GlobalMaxPooling1D
+from keras.layers import Conv1D, Flatten, Activation, MaxPooling1D, Lambda, Flatten, Conv2D, MaxPooling2D
 from keras.optimizers import SGD
 from keras import metrics
-
+from keras.layers.normalization import BatchNormalization
 stop_words = set(stopwords.words('english') + list(string.punctuation))
 
 #--------------- New Functions------------------
 def is_negation(word):
     #input: string, output:boolean
-    negation=['no','never','not','t']
+    negation=['no','never','not','n\'t','cannot','aint']
     for neg in negation:
         if (word==neg):
             return True;
     return False
 
+def replace_apostrophe(words):
+    words=words.replace(',', '.')
+    words=words.replace(';', '.')
+    return words
 
 
 # -------------- Helper Functions --------------
@@ -37,14 +41,29 @@ def tokenize(text):
     e.g.
     Input: 'It is a nice day. I am happy.'
     Output: ['it', 'is', 'a', 'nice', 'day', 'i', 'am', 'happy']
-    '''
+    
     tokens = []
     for word in nltk.word_tokenize(text):
         word = word.lower()
         if word not in stop_words and not word.isnumeric():
             tokens.append(word)
     return tokens
-
+    '''
+    tokens = []
+    new_text=replace_apostrophe(text)
+    sent_tokenize_list = sent_tokenize(new_text)
+    for sentence in sent_tokenize_list:
+        negative=False
+        for word in nltk.word_tokenize(sentence):
+            word = word.lower()
+            if is_negation(word):
+                negative=not negative
+                tokens.append(word)
+            elif word not in stop_words and not word.isnumeric():
+                if (negative):
+                    word='not_'+word
+                tokens.append(word)
+    return tokens
 
 def get_sequence(data, seq_length, vocab_dict):
     '''
@@ -85,7 +104,7 @@ def read_data(file_name, input_length, vocab=None):
         vocab_size += 1
 
     data_matrix = get_sequence(df['words'], input_length, vocab_dict)
-    stars = df['stars'].apply(int) - 1
+    stars = df['stars'].apply(int) - 1    
     return df['review_id'], stars, data_matrix, vocab
 # ----------------- End of Helper Functions-----------------
 
@@ -120,16 +139,19 @@ def load_data(input_length):
 
 if __name__ == '__main__':
     # Hyperparameters
-    input_length = 300
-    embedding_size = 100
+
+    #embedding_size=128
     hidden_size = 100
-    batch_size = 100
-    dropout_rate = 0.5
+    batch_size = 64
+    dropout_rate = 0.2
     learning_rate = 0.01
-    total_epoch = 5
+    total_epoch = 30
     kernel_size=3
     filters=1024
-
+    
+    input_length = 256
+    embedding_size = 128
+    
     train_id_list, train_data_matrix, train_data_label, \
         valid_id_list, valid_data_matrix, valid_data_label, \
         test_id_list, test_data_matrix, _, vocab = load_data(input_length)
@@ -143,27 +165,51 @@ if __name__ == '__main__':
     print("output size",K)
     # New model
 
-
-
+    
+    print("Vocab")
+    print(vocab)
 ####################CNN-LTSM Model#########################
+
+
     model = Sequential()    
     model.add(Embedding(input_dim=input_size, output_dim=embedding_size, input_length=input_length))
-    model.add(Conv1D(filters=32, kernel_size=3, padding='same'))
-    model.add(Activation("relu"))
-    model.add(keras.layers.BatchNormalization(axis=-1, momentum=0.99, epsilon=0.001, center=True, scale=True, beta_initializer='zeros', gamma_initializer='ones', moving_mean_initializer='zeros', moving_variance_initializer='ones', beta_regularizer=None, gamma_regularizer=None, beta_constraint=None, gamma_constraint=None))
+    model.add(Dropout(0.2))
+    model.add(LSTM(embedding_size, return_sequences=True, input_shape=(input_length, embedding_size))) 
+    model.add(Conv1D(filters=64, kernel_size=3, padding='same', activation='relu'))
+    model.add(BatchNormalization())
+    model.add(Conv1D(filters=64, kernel_size=3, padding='same', activation='relu'))
+    model.add(BatchNormalization())
     model.add(MaxPooling1D(pool_size=2))
-    model.add(LSTM(units=hidden_size))
-    model.add(Dense(K, activation='softmax'))
+    model.add(Conv1D(filters=32, kernel_size=3, padding='same', activation='relu'))
+    model.add(BatchNormalization())
+    model.add(Conv1D(filters=32, kernel_size=3, padding='same', activation='relu'))
+    model.add(BatchNormalization())
+    model.add(MaxPooling1D(pool_size=2))    
+    model.add(Flatten())
+    model.add(Dense(64, activation='relu'))  
+    model.add(Dense(K, activation='softmax'))    
+    model.summary()
+    for layer in model.layers:
+        print(layer.input_shape)
+    optimizer=keras.optimizers.Nadam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, schedule_decay=0.004)
+
 ####################CNN-LTSM Model#########################
 
+
+
+
+
     # Adam optimizer
-    optimizer=keras.optimizers.Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
 
     # compile model
     model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
     # training
-    model.fit(train_data_matrix, train_data_label, epochs=total_epoch, batch_size=batch_size)
+    for i in range(total_epoch):
+        print("Epoch: ",i+1)
+        model.fit(train_data_matrix, train_data_label, epochs=1, batch_size=batch_size)
+        valid_score = model.evaluate(valid_data_matrix, valid_data_label, batch_size=batch_size)
+        print('Validation Loss: {}\n Validation Accuracy: {}\n'.format(valid_score[0], valid_score[1]))  
     # testing
     train_score = model.evaluate(train_data_matrix, train_data_label, batch_size=batch_size)
     print('Training Loss: {}\n Training Accuracy: {}\n'.format(train_score[0], train_score[1]))
