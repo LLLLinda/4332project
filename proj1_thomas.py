@@ -152,7 +152,7 @@ def read_business_funny_and_useful(file_name):
     #        i=np.where(companyid==companyid[i])[0][0]
     companyid = np.array(df['business_id'])
     company_count=[len(np.where(companyid==companyid[i])[0]) for i in range(0,len(companyid))]
-    numeric_vector = np.array([df['funny'].apply(int),df['funny'].apply(int),df['cool'].apply(int)])
+    numeric_vector = np.array([df['funny'].apply(float),df['funny'].apply(float),df['cool'].apply(float)])
     numeric_vector = np.concatenate([[company_count],[numeric_vector[0]],[numeric_vector[1]],[numeric_vector[2]]])
     numeric_vector= numeric_vector.T
     return numeric_vector
@@ -266,6 +266,20 @@ if __name__ == '__main__':
     train_data_numeric=npzfile2['arr_0']
     valid_data_numeric=npzfile2['arr_1']
     test_data_numeric=npzfile2['arr_2']
+    a=np.std(train_data_numeric,axis=0)
+    b=np.std(valid_data_numeric,axis=0)
+    c=np.std(test_data_numeric,axis=0)
+    train_data_numeric=train_data_numeric.T.astype(float)
+    valid_data_numeric=valid_data_numeric.T.astype(float)
+    test_data_numeric=test_data_numeric.T.astype(float)
+    for y in range(0,3):
+        train_data_numeric[y]=[float(train_data_numeric[y][x]/a[y]) for x in range(0,len(train_data_numeric[0]))]
+        valid_data_numeric[y]=[float(valid_data_numeric[y][x]/b[y]) for x in range(0,len(valid_data_numeric[0]))]
+        test_data_numeric[y]=[float(test_data_numeric[y][x]/c[y]) for x in range(0,len(test_data_numeric[0]))]
+    train_data_numeric=train_data_numeric.T
+    valid_data_numeric=valid_data_numeric.T
+    test_data_numeric=test_data_numeric.T
+    print([test_data_numeric,valid_data_numeric,test_data_numeric],[a,b,c])
     model = create_model()
 
     es = EarlyStopping(monitor='val_loss', mode='min', patience=3)
