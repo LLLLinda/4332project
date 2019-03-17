@@ -8,26 +8,37 @@ import keras
 from sklearn import random_projection
 from sklearn.metrics import accuracy_score
 from nltk.corpus import stopwords
+from nltk.tokenize import sent_tokenize
 
 from keras.models import Model, load_model
 from keras.layers import Embedding, Dense, Dropout, LSTM, Input, Bidirectional, GRU, Activation, BatchNormalization
-from keras.layers import Conv1D, Flatten, Activation, MaxPooling1D, AveragePooling1D, Lambda, GlobalMaxPooling1D
+from keras.layers import Conv1D, Flatten, MaxPooling1D, AveragePooling1D, Lambda, GlobalMaxPooling1D, Conv2D, MaxPooling2D
 from keras.layers.merge import Concatenate
 from keras.optimizers import SGD, Adam
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras import metrics, regularizers
 from keras.utils import plot_model
 
+from sklearn.model_selection import GridSearchCV
+from keras.wrappers.scikit_learn import KerasClassifier
+
 stop_words = set(stopwords.words('english') + list(string.punctuation))
+
 
 #--------------- New Functions------------------
 def is_negation(word):
     #input: string, output:boolean
-    negation=['no','never','not','t']
+    negation=['no','never','not','n\'t','cannot','aint']
     for neg in negation:
         if (word==neg):
             return True;
     return False
+
+def replace_apostrophe(words):
+    words=words.replace(',', '.')
+    words=words.replace(';', '.')
+    return words
+
 
 # -------------- Helper Functions --------------
 
@@ -39,14 +50,29 @@ def tokenize(text):
     e.g.
     Input: 'It is a nice day. I am happy.'
     Output: ['it', 'is', 'a', 'nice', 'day', 'i', 'am', 'happy']
-    '''
+
     tokens = []
     for word in nltk.word_tokenize(text):
         word = word.lower()
         if word not in stop_words and not word.isnumeric():
             tokens.append(word)
     return tokens
-
+    '''
+    tokens = []
+    new_text=replace_apostrophe(text)
+    sent_tokenize_list = sent_tokenize(new_text)
+    for sentence in sent_tokenize_list:
+        negative=False
+        for word in nltk.word_tokenize(sentence):
+            word = word.lower()
+            if is_negation(word):
+                negative=not negative
+                tokens.append(word)
+            elif word not in stop_words and not word.isnumeric():
+                if (negative):
+                    word='not_'+word
+                tokens.append(word)
+    return tokens
 
 def get_sequence(data, seq_length, vocab_dict):
     '''
@@ -118,72 +144,115 @@ def load_data(input_length):
         valid_id_list, valid_data_matrix, valid_data_label, \
         test_id_list, test_data_matrix, None, vocab
 
-if __name__ == '__main__':
-	# Hyperparameters
-	input_length = 300
-    embedding_size = 100
-    hidden_size = 100
-    hidden_size_2 = 50
+
+def create_model(dropout_rate = 0.2, filter_size = 100, embedding_size = 100, hidden_size = 100):
+    # Hyperparameters
+    input_length = 320
+    hidden_size_2 = np.int(hidden_size/2)
     batch_size = 100
-    dropout_rate = 0.3
     learning_rate = 0.001
-    total_epoch = 3
-    filter_size = 100
+    total_epoch = 2
+
     pool_size=2
-    reg = 0.001
+    reg = 0.01
 
-	train_id_list, train_data_matrix, train_data_label, \
-	  valid_id_list, valid_data_matrix, valid_data_label, \
-	  test_id_list, test_data_matrix, _, vocab = load_data(input_length)
+    train_id_list, train_data_matrix, train_data_label, \
+      valid_id_list, valid_data_matrix, valid_data_label, \
+      test_id_list, test_data_matrix, _, vocab = load_data(input_length)
 
-	# Data shape
-	N = train_data_matrix.shape[0]
-	K = train_data_label.shape[1]
+    # Data shape
+    N = train_data_matrix.shape[0]
+    K = train_data_label.shape[1]
 
-	input_size = len(vocab) + 2
-	output_size = K
-	print("output size",K)
+    input_size = len(vocab) + 2
+    output_size = K
+    print("output size",K)
 
     #################### RCNN Model #########################
     x = Input(shape=(input_length,))
     emb = Embedding(input_dim=input_size, output_dim=embedding_size, input_length=input_length)(x)
     dr_emb = Dropout(dropout_rate)(emb)
 
-    bl = Bidirectional(LSTM(units=hidden_size, return_sequences=True, recurrent_dropout=0.2, kernel_regularizer=regularizers.l2(reg)))(dr_emb)
+    conv_1 = Conv1D(filters=16, kernel_size=7, padding='same', kernel_regularizer=regularizers.l2(reg))(dr_emb)
+    bn_conv_1 = BatchNormalization()(conv_1)
+    act_conv_1 = Activation('tanh')(bn_conv_1)
+    dr_conv_1 = Dropout(dropout_rate)(act_conv_1)
+    gmp_conv_1 = MaxPooling1D()(dr_conv_1)
 
-    conc = Concatenate(axis=-1)([emb, bl])
+    conv_2 = Conv1D(filters=16, kernel_size=5, padding='same', kernel_regularizer=regularizers.l2(reg))(gmp_conv_1)
+    bn_conv_2 = BatchNormalization()(conv_2)
+    act_conv_2 = Activation('tanh')(bn_conv_2)
+    dr_conv_2 = Dropout(dropout_rate)(act_conv_2)
+    gmp_conv_2 = MaxPooling1D()(dr_conv_2)
 
-    conv = Conv1D(filters=filter_size, kernel_size=3, padding='same', kernel_regularizer=regularizers.l2(reg))(conc)
-    bn_conv = BatchNormalization()(conv)
-    act_conv = Activation('tanh')(bn_conv)
-    dr_conv = Dropout(dropout_rate)(act_conv)
-    gmp_conv = GlobalMaxPooling1D()(dr_conv)
+    conv_3 = Conv1D(filters=32, kernel_size=3, padding='same', kernel_regularizer=regularizers.l2(reg))(gmp_conv_2)
+    bn_conv_3 = BatchNormalization()(conv_3)
+    act_conv_3 = Activation('tanh')(bn_conv_3)
+    gmp_conv_3 = MaxPooling1D()(act_conv_3)
+
+    conv_4 = Conv1D(filters=32, kernel_size=3, padding='same', kernel_regularizer=regularizers.l2(reg))(gmp_conv_3)
+    bn_conv_4 = BatchNormalization()(conv_4)
+    act_conv_4 = Activation('tanh')(bn_conv_4)
+    dr_conv_4 = Dropout(dropout_rate)(act_conv_4)
+    gmp_conv_4 = MaxPooling1D()(dr_conv_4)
+
+    lstm = Bidirectional(LSTM(units=hidden_size_2, recurrent_dropout=0.2))(gmp_conv_4)
 
     gru = Bidirectional(GRU(units=hidden_size_2, recurrent_dropout=0.2))(dr_emb)
-    merge = Concatenate(axis=-1)([gmp_conv, gru])
-    d = Dense(30, activation='relu', kernel_regularizer=regularizers.l2(reg))(merge)
+    merge = Concatenate(axis=-1)([lstm, gru])
+    dr = Dropout(dropout_rate)(merge)
+    d = Dense(125, activation='relu', kernel_regularizer=regularizers.l2(reg))(dr)
+    d = Dense(25, activation='relu')(d)
     y = Dense(output_size, activation='softmax')(d)
     model = Model(x, y)
     #################### RCNN Model #########################
 
-    print(model.summary())
-    #plot_model(model)
-
-    # Adam optimizer
+    #print(model.summary())
+    #plot_model(model, to_file='model_v6.png')
     optimizer=keras.optimizers.Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, decay=0.0, amsgrad=False)
 
     # compile model
     model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+    return model
 
-    es = EarlyStopping(monitor='val_loss', mode='min', patience=1)
-    mc = ModelCheckpoint('best_model_bilstm5.h5', monitor='val_acc', mode='max', verbose=1,save_best_only=True)
+
+if __name__ == '__main__':
+    # Hyperparameters
+    input_length = 320
+    train_id_list, train_data_matrix, train_data_label, \
+      valid_id_list, valid_data_matrix, valid_data_label, \
+      test_id_list, test_data_matrix, _, vocab = load_data(input_length)
+
+    model = create_model()
+
+    es = EarlyStopping(monitor='val_loss', mode='min', patience=3)
+    mc = ModelCheckpoint('best_model.h5', monitor='val_acc', mode='max', verbose=1,save_best_only=True)
 
     validation = (valid_data_matrix, valid_data_label)
     # training
     history = model.fit(train_data_matrix, train_data_label, validation_data=validation, epochs=total_epoch, batch_size=batch_size, callbacks=[es, mc])
 
-    plot_history(history)
-    saved_model = load_model('best_model_bilstm5.h5')
+    '''
+    model = KerasClassifier(build_fn=create_model, epochs=2,  verbose=0)
+    dropout_rate = [0.3, 0.5, 0.7]
+    filter_size = [10, 50, 100, 200]
+    embedding_size = [50, 100, 200]
+    hidden_size = [50, 100, 200]
+
+    param_grid = dict(dropout_rate=dropout_rate, filter_size=filter_size, embedding_size=embedding_size, hidden_size=hidden_size)
+    grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=-1)
+    grid_result = grid.fit(train_data_matrix, train_data_label)
+
+    print("Best: %f using %s" % (grid_result.best_score_, grid_result.best_params_))
+    means = grid_result.cv_results_['mean_test_score']
+    stds = grid_result.cv_results_['std_test_score']
+    params = grid_result.cv_results_['params']
+    for mean, stdev, param in zip(means, stds, params):
+        print("%f (%f) with: %r" % (mean, stdev, param))
+
+    '''
+    #plot_history(history)
+    saved_model = load_model('best_model.h5')
 
     # testing
     train_score = saved_model.evaluate(train_data_matrix, train_data_label, batch_size=batch_size)
@@ -191,9 +260,9 @@ if __name__ == '__main__':
     valid_score = saved_model.evaluate(valid_data_matrix, valid_data_label, batch_size=batch_size)
     print('Validation Loss: {}\n Validation Accuracy: {}\n'.format(valid_score[0], valid_score[1]))
 
-	# predicting
-	test_pre = model.predict(test_data_matrix, batch_size=batch_size).argmax(axis=-1) + 1
-	sub_df = pd.DataFrame()
-	sub_df["review_id"] = test_id_list
-	sub_df["pre"] = test_pre
-	sub_df.to_csv("pre_5.csv", index=False)
+    # predicting
+    #test_pre = model.predict(test_data_matrix, batch_size=batch_size).argmax(axis=-1) + 1
+    #sub_df = pd.DataFrame()
+    #sub_df["review_id"] = test_id_list
+    #sub_df["pre"] = test_pre
+    #sub_df.to_csv("pre_5.csv", index=False)
