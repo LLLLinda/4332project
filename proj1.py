@@ -15,6 +15,9 @@ from keras.optimizers import SGD
 from keras import metrics
 from keras.layers.normalization import BatchNormalization
 stop_words = set(stopwords.words('english') + list(string.punctuation))
+from keras import initializers
+from keras.layers import LeakyReLU
+
 
 #--------------- New Functions------------------
 def is_negation(word):
@@ -140,17 +143,12 @@ def load_data(input_length):
 if __name__ == '__main__':
     # Hyperparameters
 
-    #embedding_size=128
-    hidden_size = 100
-    batch_size = 64
-    dropout_rate = 0.2
-    learning_rate = 0.01
-    total_epoch = 30
-    kernel_size=3
-    filters=1024
-    
+
+
+    batch_size = 128
     input_length = 256
     embedding_size = 128
+    total_epoch=30
     
     train_id_list, train_data_matrix, train_data_label, \
         valid_id_list, valid_data_matrix, valid_data_label, \
@@ -166,11 +164,8 @@ if __name__ == '__main__':
     # New model
 
     
-    print("Vocab")
-    print(vocab)
+
 ####################CNN-LTSM Model#########################
-
-
     model = Sequential()    
     model.add(Embedding(input_dim=input_size, output_dim=embedding_size, input_length=input_length))
     model.add(Dropout(0.2))
@@ -191,8 +186,8 @@ if __name__ == '__main__':
     model.summary()
     for layer in model.layers:
         print(layer.input_shape)
-    optimizer=keras.optimizers.Nadam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, schedule_decay=0.004)
-
+    optimizer=keras.optimizers.Adam(lr=0.000025, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+    
 ####################CNN-LTSM Model#########################
 
 
@@ -204,12 +199,20 @@ if __name__ == '__main__':
     # compile model
     model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
+
+
+
     # training
+    best_acc=0
     for i in range(total_epoch):
         print("Epoch: ",i+1)
         model.fit(train_data_matrix, train_data_label, epochs=1, batch_size=batch_size)
         valid_score = model.evaluate(valid_data_matrix, valid_data_label, batch_size=batch_size)
         print('Validation Loss: {}\n Validation Accuracy: {}\n'.format(valid_score[0], valid_score[1]))  
+        if (valid_score[1]>best_acc):
+            best_acc=valid_score[1]
+        print('best validation accuracy',best_acc)
+    print("best validation accuracy",best_acc)
     # testing
     train_score = model.evaluate(train_data_matrix, train_data_label, batch_size=batch_size)
     print('Training Loss: {}\n Training Accuracy: {}\n'.format(train_score[0], train_score[1]))
