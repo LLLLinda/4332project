@@ -155,7 +155,6 @@ def read_business_funny_and_useful(file_name):
     numeric_vector = np.array([df['funny'].apply(int),df['funny'].apply(int),df['cool'].apply(int)])
     numeric_vector = np.concatenate([[company_count],[numeric_vector[0]],[numeric_vector[1]],[numeric_vector[2]]])
     numeric_vector= numeric_vector.T
-    print(numeric_vector)
     return numeric_vector
 
 
@@ -228,7 +227,7 @@ if __name__ == '__main__':
     hidden_size_2 = np.int(hidden_size/2)
     batch_size = 100
     learning_rate = 0.001
-    total_epoch = 2
+    total_epoch = 10
 
     pool_size=2
     reg = 0.01
@@ -258,10 +257,15 @@ if __name__ == '__main__':
         input_size=int(vocab_len)+2
     output_size = K
  
-    train_data_numeric = read_business_funny_and_useful("data/train.csv")
-    valid_data_numeric = read_business_funny_and_useful("data/valid.csv")
-    test_data_numeric = read_business_funny_and_useful("data/test.csv")
-    np.savez('save_numeric_matrix',train_data_numeric,valid_data_numeric,test_data_numeric)
+    #train_data_numeric = read_business_funny_and_useful("data/train.csv")
+    #valid_data_numeric = read_business_funny_and_useful("data/valid.csv")
+    #test_data_numeric = read_business_funny_and_useful("data/test.csv")
+    #np.savez('save_numeric_matrix',train_data_numeric,valid_data_numeric,test_data_numeric)
+    npzfile2=np.load('save_numeric_matrix.npz')
+
+    train_data_numeric=npzfile2['arr_0']
+    valid_data_numeric=npzfile2['arr_1']
+    test_data_numeric=npzfile2['arr_2']
     model = create_model()
 
     es = EarlyStopping(monitor='val_loss', mode='min', patience=3)
