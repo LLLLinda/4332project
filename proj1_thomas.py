@@ -144,31 +144,40 @@ def load_data(input_length):
         valid_id_list, valid_data_matrix, valid_data_label, \
         test_id_list, test_data_matrix, None, vocab
 
+def read_business_funny_and_useful(file_name):
+    df = pd.read_csv(file_name)
+    company = np.array([x for x in range(0,len(df['business_id']))])
+    #count=0;
+    #for i in range(len(df)):
+    #    exist=False
+    #    for j in range(df.index.get_loc(i)):
+    #        if i==j:
+    #            exist=True
+    #            company[df.index.get_loc(i)]=company[df.index.get_loc(j)]
+    #            exit
+    #    if not exist:
+    #        company[df.index.get_loc(i)]=int(count)
+    #        count+=1
+
+    numeric_vector = np.array([df['funny'].apply(int),df['funny'].apply(int)])
+    numeric_vector = np.concatenate([[company],[numeric_vector[0]],[numeric_vector[1]]])
+    numeric_vector= numeric_vector.T
+    return numeric_vector
+
+
+
 
 def create_model(dropout_rate = 0.2, filter_size = 100, embedding_size = 100, hidden_size = 100):
-    # Hyperparameters
-    input_length = 320
-    hidden_size_2 = np.int(hidden_size/2)
-    batch_size = 100
-    learning_rate = 0.001
-    total_epoch = 2
-
-    pool_size=2
-    reg = 0.01
-
-    train_id_list, train_data_matrix, train_data_label, \
-      valid_id_list, valid_data_matrix, valid_data_label, \
-      test_id_list, test_data_matrix, _, vocab = load_data(input_length)
-
-    # Data shape
-    N = train_data_matrix.shape[0]
-    K = train_data_label.shape[1]
-
-    input_size = len(vocab) + 2
-    output_size = K
-    print("output size",K)
 
     #################### RCNN Model #########################
+    # define two sets of inputs
+    inputB = Input(shape=(3,))
+    model_numeric_Dense=Dense(64, activation='relu', input_dim=3)(inputB)
+    model_numeric_Drop=(Dropout(0.5))(model_numeric_Dense)
+    model_numeric_Dense2=(Dense(64, activation='relu'))(model_numeric_Drop)
+    model_numeric_Drop2=(Dropout(0.5))(model_numeric_Dense2)
+    model_numeric_Dense3=(Dense(5, activation='softmax'))(model_numeric_Drop2)
+
     x = Input(shape=(input_length,))
     emb = Embedding(input_dim=input_size, output_dim=embedding_size, input_length=input_length)(x)
     dr_emb = Dropout(dropout_rate)(emb)
@@ -203,8 +212,9 @@ def create_model(dropout_rate = 0.2, filter_size = 100, embedding_size = 100, hi
     dr = Dropout(dropout_rate)(merge)
     d = Dense(125, activation='relu', kernel_regularizer=regularizers.l2(reg))(dr)
     d = Dense(25, activation='relu')(d)
-    y = Dense(output_size, activation='softmax')(d)
-    model = Model(x, y)
+    merge2 = Concatenate(axis=-1)([d, model_numeric_Dense3])
+    y = Dense(output_size, activation='softmax')(merge2)
+    model = Model([x,inputB], y)
     #################### RCNN Model #########################
 
     #print(model.summary())
@@ -218,19 +228,54 @@ def create_model(dropout_rate = 0.2, filter_size = 100, embedding_size = 100, hi
 
 if __name__ == '__main__':
     # Hyperparameters
+    # Hyperparameters
     input_length = 320
-    train_id_list, train_data_matrix, train_data_label, \
-      valid_id_list, valid_data_matrix, valid_data_label, \
-      test_id_list, test_data_matrix, _, vocab = load_data(input_length)
+    hidden_size = 100
+    hidden_size_2 = np.int(hidden_size/2)
+    batch_size = 100
+    learning_rate = 0.001
+    total_epoch = 2
+
+    pool_size=2
+    reg = 0.01
+    #train_id_list, train_data_matrix, train_data_label, \
+    #  valid_id_list, valid_data_matrix, valid_data_label, \
+    #  test_id_list, test_data_matrix, _, vocab = load_data(input_length)
+    #np.savez('save_matrix', train_id_list, train_data_matrix, train_data_label, \
+    #    valid_id_list, valid_data_matrix, valid_data_label, \
+    #    test_id_list, test_data_matrix,  len(vocab))
+    npzfile=np.load('save_matrix.npz')
+
+    train_id_list=npzfile['arr_0']
+    train_data_matrix=npzfile['arr_1']
+    train_data_label=npzfile['arr_2']
+    valid_id_list=npzfile['arr_3']
+    valid_data_matrix=npzfile['arr_4']
+    valid_data_label=npzfile['arr_5']
+    test_id_list=npzfile['arr_6']
+    test_data_matrix=npzfile['arr_7']
+    vocab_len=npzfile['arr_8'] 
+    # Data shape
+    N = train_data_matrix.shape[0]
+    K = train_data_label.shape[1]
+    if vocab_len is None:
+        input_size = len(vocab)+2
+    else:
+        input_size=int(vocab_len)+2
+    output_size = K
+ 
+    train_data_numeric = read_business_funny_and_useful("data/train.csv")
+    valid_data_numeric = read_business_funny_and_useful("data/valid.csv")
+    test_data_numeric = read_business_funny_and_useful("data/test.csv")
 
     model = create_model()
 
     es = EarlyStopping(monitor='val_loss', mode='min', patience=3)
     mc = ModelCheckpoint('best_model.h5', monitor='val_acc', mode='max', verbose=1,save_best_only=True)
 
-    validation = (valid_data_matrix, valid_data_label)
+    validation = ([valid_data_matrix,valid_data_numeric], valid_data_label)
     # training
-    history = model.fit(train_data_matrix, train_data_label, validation_data=validation, epochs=total_epoch, batch_size=batch_size, callbacks=[es, mc])
+    history = model.fit([train_data_matrix,train_data_numeric], train_data_label, validation_data=validation, epochs=total_epoch, batch_size=batch_size, callbacks=[es, mc])
 
     '''
     model = KerasClassifier(build_fn=create_model, epochs=2,  verbose=0)
@@ -255,9 +300,9 @@ if __name__ == '__main__':
     saved_model = load_model('best_model.h5')
 
     # testing
-    train_score = saved_model.evaluate(train_data_matrix, train_data_label, batch_size=batch_size)
+    train_score = saved_model.evaluate([train_data_matrix,train_data_numeric], train_data_label, batch_size=batch_size)
     print('Training Loss: {}\n Training Accuracy: {}\n'.format(train_score[0], train_score[1]))
-    valid_score = saved_model.evaluate(valid_data_matrix, valid_data_label, batch_size=batch_size)
+    valid_score = saved_model.evaluate([valid_data_matrix,valid_data_numeric], valid_data_label, batch_size=batch_size)
     print('Validation Loss: {}\n Validation Accuracy: {}\n'.format(valid_score[0], valid_score[1]))
 
     # predicting
