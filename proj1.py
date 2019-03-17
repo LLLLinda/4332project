@@ -17,7 +17,7 @@ from keras.layers.normalization import BatchNormalization
 stop_words = set(stopwords.words('english') + list(string.punctuation))
 from keras import initializers
 from keras.layers import LeakyReLU
-
+import random
 
 #--------------- New Functions------------------
 def is_negation(word):
@@ -33,6 +33,15 @@ def replace_apostrophe(words):
     words=words.replace(';', '.')
     return words
 
+
+def split(arr, size):
+     arrs = []
+     while len(arr) > size:
+         pice = arr[:size]
+         arrs.append(pice)
+         arr   = arr[size:]
+     arrs.append(arr)
+     return arrs
 
 # -------------- Helper Functions --------------
 
@@ -86,12 +95,35 @@ def get_sequence(data, seq_length, vocab_dict):
     return data_matrix
 
 
+
+
 def read_data(file_name, input_length, vocab=None):
     """
     https://pandas.pydata.org/pandas-docs/stable/generated/pandas.read_csv.html
     """
     df = pd.read_csv(file_name)
     df['words'] = df['text'].apply(tokenize)
+    cool = df['cool'].apply(int)
+    funny = df['funny'].apply(int)
+    useful = df['useful'].apply(int)
+
+
+    for i in range(df['words'].shape[0]):
+        if (df['cool'][i]>=2):
+            df['words'][i].append('cool:2');
+        else:
+            df['words'][i].append('cool:'+str(df['cool'][i]))
+        df['words'][i].append('null')
+        if (df['funny'][i]>=2):
+            df['words'][i].append('funny:2');
+        else:
+            df['words'][i].append('funny:'+str(df['funny'][i]))
+        df['words'][i].append('null')
+        if (df['useful'][i]>=2):
+            df['words'][i].append('useful:2');
+        else:
+            df['words'][i].append('useful:'+str(df['useful'][i]))
+        df['words'][i].append('null')
 
     if vocab is None:
         vocab = set()
@@ -148,7 +180,8 @@ if __name__ == '__main__':
     batch_size = 128
     input_length = 256
     embedding_size = 128
-    total_epoch=30
+    total_epoch=4
+    learning_rate=0.001
     
     train_id_list, train_data_matrix, train_data_label, \
         valid_id_list, valid_data_matrix, valid_data_label, \
@@ -164,55 +197,65 @@ if __name__ == '__main__':
     # New model
 
     
+    for gs in range(20):
+        learning_rate=random.uniform(1e-4,1e-3)
+        batch_size=random.randint(32,256)
 
-####################CNN-LTSM Model#########################
-    model = Sequential()    
-    model.add(Embedding(input_dim=input_size, output_dim=embedding_size, input_length=input_length))
-    model.add(Dropout(0.2))
-    model.add(LSTM(embedding_size, return_sequences=True, input_shape=(input_length, embedding_size))) 
-    model.add(Conv1D(filters=64, kernel_size=3, padding='same', activation='relu'))
-    model.add(BatchNormalization())
-    model.add(Conv1D(filters=64, kernel_size=3, padding='same', activation='relu'))
-    model.add(BatchNormalization())
-    model.add(MaxPooling1D(pool_size=2))
-    model.add(Conv1D(filters=32, kernel_size=3, padding='same', activation='relu'))
-    model.add(BatchNormalization())
-    model.add(Conv1D(filters=32, kernel_size=3, padding='same', activation='relu'))
-    model.add(BatchNormalization())
-    model.add(MaxPooling1D(pool_size=2))    
-    model.add(Flatten())
-    model.add(Dense(64, activation='relu'))  
-    model.add(Dense(K, activation='softmax'))    
-    model.summary()
-    for layer in model.layers:
-        print(layer.input_shape)
-    optimizer=keras.optimizers.Adam(lr=0.000025, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
-    
-####################CNN-LTSM Model#########################
-
+    ####################CNN-LTSM Model#########################
+        model = Sequential()    
+        model.add(Embedding(input_dim=input_size, output_dim=embedding_size, input_length=input_length))
+    #    model.add(Dropout(0.2))
+        model.add(LSTM(embedding_size, return_sequences=True, input_shape=(input_length, embedding_size), dropout=0.5, recurrent_dropout=0.5)) 
+        model.add(Conv1D(filters=64, kernel_size=3, padding='same', activation='relu'))
+        model.add(BatchNormalization())
+        
+        model.add(Conv1D(filters=64, kernel_size=3, padding='same', activation='relu'))
+        model.add(BatchNormalization())
+        model.add(MaxPooling1D(pool_size=2))    
+        model.add(Flatten())
+        model.add(Dense(128, activation='relu'))  
+        model.add(Dense(K, activation='softmax'))    
+        model.summary()
+        for layer in model.layers:
+            print(layer.input_shape)
+        optimizer=keras.optimizers.Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+        
+    ####################CNN-LTSM Model#########################
 
 
 
 
-    # Adam optimizer
 
-    # compile model
-    model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+        # Adam optimizer
 
+        # compile model
+        model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
+        train_data_matrix_split=split(train_data_matrix,20000)
+        train_data_label_split=split(train_data_label,20000)
 
+        print('learning rate: ',learning_rate)
+        print('batch size: ',batch_size)
+        # training
+        best_acc=0
+        for i in range(total_epoch):
+            print("Epoch: ",i+1)
+            print("current best validation accuracy",best_acc)
+            for j in range(5):
+                model.fit(train_data_matrix_split[j], train_data_label_split[j], epochs=1, batch_size=batch_size)
+                valid_score = model.evaluate(valid_data_matrix, valid_data_label, batch_size=batch_size)
+                print('Validation Loss: {}\n Validation Accuracy: {}\n'.format(valid_score[0], valid_score[1]))  
+                if (valid_score[1]>best_acc):
+                    best_acc=valid_score[1]
+                    if (best_acc>0.6):
+                        print('new validation accuracy record! Update prediction data...')
+                        test_pre = model.predict(test_data_matrix, batch_size=batch_size).argmax(axis=-1) + 1
+                        sub_df = pd.DataFrame()
+                        sub_df["review_id"] = test_id_list
+                        sub_df["pre"] = test_pre
+                        sub_df.to_csv("pre.csv", index=False)
+        
 
-    # training
-    best_acc=0
-    for i in range(total_epoch):
-        print("Epoch: ",i+1)
-        model.fit(train_data_matrix, train_data_label, epochs=1, batch_size=batch_size)
-        valid_score = model.evaluate(valid_data_matrix, valid_data_label, batch_size=batch_size)
-        print('Validation Loss: {}\n Validation Accuracy: {}\n'.format(valid_score[0], valid_score[1]))  
-        if (valid_score[1]>best_acc):
-            best_acc=valid_score[1]
-        print('best validation accuracy',best_acc)
-    print("best validation accuracy",best_acc)
     # testing
     train_score = model.evaluate(train_data_matrix, train_data_label, batch_size=batch_size)
     print('Training Loss: {}\n Training Accuracy: {}\n'.format(train_score[0], train_score[1]))
