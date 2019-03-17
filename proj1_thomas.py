@@ -146,22 +146,16 @@ def load_data(input_length):
 
 def read_business_funny_and_useful(file_name):
     df = pd.read_csv(file_name)
-    company = np.array([0 for x in range(0,len(df['business_id']))])
-    #count=0;
-    #for i in range(len(df)):
-    #    exist=False
-    #    for j in range(df.index.get_loc(i)):
-    #        if i==j:
-    #            exist=True
-    #            company[df.index.get_loc(i)]=company[df.index.get_loc(j)]
-    #            exit
-    #    if not exist:
-    #        company[df.index.get_loc(i)]=int(count)
-    #        count+=1
-
+    #company = np.array([x for x in range(0,len(df['business_id']))])
+    #for i in company:
+    #    if len(np.where(companyid==companyid[i])[0])>1:
+    #        i=np.where(companyid==companyid[i])[0][0]
+    companyid = np.array(df['business_id'])
+    company_count=[len(np.where(companyid==companyid[i])[0]) for i in range(0,len(companyid))]
     numeric_vector = np.array([df['funny'].apply(int),df['funny'].apply(int),df['cool'].apply(int)])
-    numeric_vector = np.concatenate([[company],[numeric_vector[0]],[numeric_vector[1]],[numeric_vector[2]]])
+    numeric_vector = np.concatenate([[company_count],[numeric_vector[0]],[numeric_vector[1]],[numeric_vector[2]]])
     numeric_vector= numeric_vector.T
+    print(numeric_vector)
     return numeric_vector
 
 
@@ -267,7 +261,7 @@ if __name__ == '__main__':
     train_data_numeric = read_business_funny_and_useful("data/train.csv")
     valid_data_numeric = read_business_funny_and_useful("data/valid.csv")
     test_data_numeric = read_business_funny_and_useful("data/test.csv")
-
+    np.savez('save_numeric_matrix',train_data_numeric,valid_data_numeric,test_data_numeric)
     model = create_model()
 
     es = EarlyStopping(monitor='val_loss', mode='min', patience=3)
