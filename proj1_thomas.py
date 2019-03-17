@@ -119,8 +119,8 @@ def load_data(input_length):
         test_id_list, test_data_matrix, None, vocab
 
 if __name__ == '__main__':
-	# Hyperparameters
-	input_length = 300
+    # Hyperparameters
+    input_length = 300
     embedding_size = 100
     hidden_size = 100
     hidden_size_2 = 50
@@ -132,17 +132,17 @@ if __name__ == '__main__':
     pool_size=2
     reg = 0.001
 
-	train_id_list, train_data_matrix, train_data_label, \
-	  valid_id_list, valid_data_matrix, valid_data_label, \
-	  test_id_list, test_data_matrix, _, vocab = load_data(input_length)
+    train_id_list, train_data_matrix, train_data_label, \
+	valid_id_list, valid_data_matrix, valid_data_label, \
+	test_id_list, test_data_matrix, _, vocab = load_data(input_length)
 
-	# Data shape
-	N = train_data_matrix.shape[0]
-	K = train_data_label.shape[1]
+    # Data shape
+    N = train_data_matrix.shape[0]
+    K = train_data_label.shape[1]
 
-	input_size = len(vocab) + 2
-	output_size = K
-	print("output size",K)
+    input_size = len(vocab) + 2
+    output_size = K
+    print("output size",K)
 
     #################### RCNN Model #########################
     x = Input(shape=(input_length,))
@@ -191,9 +191,9 @@ if __name__ == '__main__':
     valid_score = saved_model.evaluate(valid_data_matrix, valid_data_label, batch_size=batch_size)
     print('Validation Loss: {}\n Validation Accuracy: {}\n'.format(valid_score[0], valid_score[1]))
 
-	# predicting
-	test_pre = model.predict(test_data_matrix, batch_size=batch_size).argmax(axis=-1) + 1
-	sub_df = pd.DataFrame()
-	sub_df["review_id"] = test_id_list
-	sub_df["pre"] = test_pre
-	sub_df.to_csv("pre_5.csv", index=False)
+    # predicting
+    test_pre = model.predict(test_data_matrix, batch_size=batch_size).argmax(axis=-1) + 1
+    sub_df = pd.DataFrame()
+    sub_df["review_id"] = test_id_list
+    sub_df["pre"] = test_pre
+    sub_df.to_csv("pre_5.csv", index=False)
