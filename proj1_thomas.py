@@ -146,7 +146,7 @@ def load_data(input_length):
 
 def read_business_funny_and_useful(file_name):
     df = pd.read_csv(file_name)
-    company = np.array([x for x in range(0,len(df['business_id']))])
+    company = np.array([0 for x in range(0,len(df['business_id']))])
     #count=0;
     #for i in range(len(df)):
     #    exist=False
@@ -159,8 +159,8 @@ def read_business_funny_and_useful(file_name):
     #        company[df.index.get_loc(i)]=int(count)
     #        count+=1
 
-    numeric_vector = np.array([df['funny'].apply(int),df['funny'].apply(int)])
-    numeric_vector = np.concatenate([[company],[numeric_vector[0]],[numeric_vector[1]]])
+    numeric_vector = np.array([df['funny'].apply(int),df['funny'].apply(int),df['cool'].apply(int)])
+    numeric_vector = np.concatenate([[company],[numeric_vector[0]],[numeric_vector[1]],[numeric_vector[2]]])
     numeric_vector= numeric_vector.T
     return numeric_vector
 
@@ -171,7 +171,7 @@ def create_model(dropout_rate = 0.2, filter_size = 100, embedding_size = 100, hi
 
     #################### RCNN Model #########################
     # define two sets of inputs
-    inputB = Input(shape=(3,))
+    inputB = Input(shape=(4,))
     model_numeric_Dense=Dense(64, activation='relu', input_dim=3)(inputB)
     model_numeric_Drop=(Dropout(0.5))(model_numeric_Dense)
     model_numeric_Dense2=(Dense(64, activation='relu'))(model_numeric_Drop)
